@@ -134,7 +134,7 @@ export async function getDoctorPatientById(req, res, next) {
     const isObjectId = mongoose.Types.ObjectId.isValid(patientParam);
 
     const patient = await Patient.findOne(
-      isObjectId ? { $or: [{ _id: patientParam }, { legacyId: patientParam }] } : { legacyId: patientParam }
+      isObjectId ? { $or: [{ _id: patientParam }, { legacyId: patientParam }, { userId: patientParam }] } : { legacyId: patientParam }
     ).populate('userId', 'name email phone avatar');
 
     if (!patient) {
@@ -329,7 +329,7 @@ export async function addClinicalNote(req, res, next) {
     const patientParam = req.params.id;
     const isObjectId = mongoose.Types.ObjectId.isValid(patientParam);
     const patient = await Patient.findOne(
-      isObjectId ? { $or: [{ _id: patientParam }, { legacyId: patientParam }] } : { legacyId: patientParam }
+      isObjectId ? { $or: [{ _id: patientParam }, { legacyId: patientParam }, { userId: patientParam }] } : { legacyId: patientParam }
     );
 
     if (!patient) {
@@ -363,7 +363,7 @@ export async function addFollowup(req, res, next) {
     const patientParam = req.params.id;
     const isObjectId = mongoose.Types.ObjectId.isValid(patientParam);
     const patient = await Patient.findOne(
-      isObjectId ? { $or: [{ _id: patientParam }, { legacyId: patientParam }] } : { legacyId: patientParam }
+      isObjectId ? { $or: [{ _id: patientParam }, { legacyId: patientParam }, { userId: patientParam }] } : { legacyId: patientParam }
     );
 
     if (!patient) {
@@ -440,7 +440,11 @@ export async function getDoctorReports(req, res, next) {
  */
 export async function getDoctorReportById(req, res, next) {
   try {
-    const report = await MedicalReport.findById(req.params.id)
+    const reportParam = req.params.id;
+    const isObjectId = mongoose.Types.ObjectId.isValid(reportParam);
+    const report = await MedicalReport.findOne(
+      isObjectId ? { $or: [{ _id: reportParam }, { reportId: reportParam }] } : { reportId: reportParam }
+    )
       .populate('userId', 'name email phone')
       .populate('patientId')
       .populate('reviewedByDoctorId');
@@ -467,7 +471,11 @@ export async function reviewMedicalReport(req, res, next) {
 
     const { reviewStatus = 'Reviewed', reviewNotes = '' } = req.body;
 
-    const report = await MedicalReport.findById(req.params.id);
+    const reportParam = req.params.id;
+    const isObjectId = mongoose.Types.ObjectId.isValid(reportParam);
+    const report = await MedicalReport.findOne(
+      isObjectId ? { $or: [{ _id: reportParam }, { reportId: reportParam }] } : { reportId: reportParam }
+    );
     if (!report) {
       return res.status(404).json({ error: { code: 'REPORT_NOT_FOUND', message: 'Medical report not found.' } });
     }

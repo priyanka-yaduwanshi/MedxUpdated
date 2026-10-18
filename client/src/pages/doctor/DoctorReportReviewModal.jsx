@@ -10,8 +10,11 @@ export function DoctorReportReviewModal({ report, onClose, onSuccess }) {
 
   if (!report) return null;
 
-  // Extract parameters
-  const params = report.parameters ? Object.entries(report.parameters) : [];
+  // Extract parameters safely
+  const rawParams = report.parameters;
+  const params = rawParams
+    ? (rawParams instanceof Map ? Array.from(rawParams.entries()) : (typeof rawParams === 'object' ? Object.entries(rawParams) : []))
+    : [];
   const mlResult = report.mlResult || {};
 
   const handleSubmit = async (e) => {
@@ -188,17 +191,23 @@ export function DoctorReportReviewModal({ report, onClose, onSuccess }) {
                     </tr>
                   ) : (
                     params.map(([key, val], idx) => {
-                      const isAbnormal = val.status === 'High' || val.status === 'Low' || val.status === 'Critical';
+                      const isObj = typeof val === 'object' && val !== null;
+                      const displayVal = isObj ? val.value : val;
+                      const displayUnit = isObj ? (val.unit || '') : '';
+                      const displayRange = isObj ? (val.ref_range || val.referenceRange || 'Standard') : 'Standard';
+                      const displayStatus = isObj ? (val.status || 'Normal') : 'Normal';
+                      const isAbnormal = ['High', 'Low', 'Critical', 'critical_high', 'critical_low'].includes(displayStatus);
+
                       return (
                         <tr key={key} style={{ borderBottom: idx < params.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
                           <td style={{ padding: '0.625rem 1rem', fontWeight: 500, color: 'var(--medx-navy)' }}>
                             {key.replace(/_/g, ' ').toUpperCase()}
                           </td>
                           <td style={{ padding: '0.625rem 1rem', fontWeight: 700, color: isAbnormal ? '#DC2626' : '#0F172A' }}>
-                            {val.value} {val.unit}
+                            {displayVal} {displayUnit}
                           </td>
                           <td style={{ padding: '0.625rem 1rem', color: '#64748B' }}>
-                            {val.ref_range || val.referenceRange || 'Standard'}
+                            {displayRange}
                           </td>
                           <td style={{ padding: '0.625rem 1rem' }}>
                             <span style={{
@@ -209,7 +218,7 @@ export function DoctorReportReviewModal({ report, onClose, onSuccess }) {
                               backgroundColor: isAbnormal ? '#FEF2F2' : '#F0FDF4',
                               color: isAbnormal ? '#B91C1C' : '#15803D'
                             }}>
-                              {val.status || 'Normal'}
+                              {displayStatus}
                             </span>
                           </td>
                         </tr>

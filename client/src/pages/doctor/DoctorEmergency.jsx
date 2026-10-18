@@ -16,7 +16,9 @@ export default function DoctorEmergency({
   const [error, setError] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [isMuted, setIsMuted] = useState(false);
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isSirenPlaying, setIsSirenPlaying] = useState(false);
+  const isPlayingAudio = isSirenPlaying;
+  const setIsPlayingAudio = setIsSirenPlaying;
   const [selectedMapAlert, setSelectedMapAlert] = useState(null);
 
   // Acknowledge & Dispatch Modal
@@ -25,9 +27,35 @@ export default function DoctorEmergency({
   const [dispatchStatus, setDispatchStatus] = useState('Rapid Response Squad Dispatched');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Audio Context ref for synthesized simulation
+  // Audio Context & oscillator refs for Web Audio API siren
   const audioCtxRef = useRef(null);
   const oscRef = useRef(null);
+  const isMutedRef = useRef(isMuted);
+  const prevActiveCountRef = useRef(null);
+
+  // Sync mute state ref
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  // Clean up audio nodes on unmount
+  useEffect(() => {
+    return () => {
+      if (oscRef.current) {
+        try {
+          oscRef.current.stop();
+          oscRef.current.disconnect();
+        } catch (_) {}
+        oscRef.current = null;
+      }
+      if (audioCtxRef.current) {
+        try {
+          audioCtxRef.current.close();
+        } catch (_) {}
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   const fetchAlerts = async () => {
     try {
@@ -50,9 +78,42 @@ export default function DoctorEmergency({
     return () => clearInterval(timer);
   }, []);
 
-  // Web Audio Synth for Alarm simulation
-  const triggerAudioTest = () => {
-    if (isPlayingAudio) {
+  // Web Audio Synthesizer: Refined internal hospital clinical alert tone (crisp dual-tone telemetry pings)
+  const stopEmergencySiren = () => {
+    if (oscRef.current) {
+      try {
+        oscRef.current.stop();
+        oscRef.current.disconnect();
+      } catch (_) {}
+      oscRef.current = null;
+    }
+    setIsSirenPlaying(false);
+  };
+
+  const playEmergencySiren = (force = false) => {
+    // If sound is currently active and user manually clicks to toggle off
+    if (isSirenPlaying && oscRef.current) {
+      stopEmergencySiren();
+      return;
+    }
+
+    const shouldForce = force === true || (typeof force === 'object' && force !== null);
+    if (isMutedRef.current && !shouldForce) {
+      return;
+    }
+
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      // Stop any prior active tone
       if (oscRef.current) {
         try {
           oscRef.current.stop();
@@ -60,40 +121,93 @@ export default function DoctorEmergency({
         } catch (_) {}
         oscRef.current = null;
       }
-      setIsPlayingAudio(false);
-      return;
-    }
-
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new AudioCtx();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
 
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.4);
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+      // Triangle oscillator provides a clean, clinical indoor workstation chime/ping
+      osc.type = 'triangle';
+
+      const now = ctx.currentTime;
+
+      // Dual alternating clinical frequencies: High (880Hz / A5) & Low (659Hz / E5)
+      // Rapid pulsed pattern: High ping -> Low ping -> High ping -> Low ping (short, controlled ~0.72s burst)
+      const pulseDuration = 0.13; // 130ms tone
+      const pauseDuration = 0.05; // 50ms pause between pings
+      const stepInterval = pulseDuration + pauseDuration; // 180ms per pulse step
+      const sequence = [880, 659, 880, 659]; // 4 distinct clinical pings
+
+      gain.gain.setValueAtTime(0.0001, now);
+
+      sequence.forEach((freq, idx) => {
+        const startTime = now + (idx * stepInterval);
+        const peakTime = startTime + 0.015;
+        const decayTime = startTime + pulseDuration;
+
+        // Set pitch for this specific ping
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        // Shape envelope for a crisp bedside/workstation alert ping
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.linearRampToValueAtTime(0.22, peakTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, decayTime);
+      });
+
+      const totalDuration = sequence.length * stepInterval;
 
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.5);
 
-      setIsPlayingAudio(true);
-      setTimeout(() => setIsPlayingAudio(false), 500);
+      osc.onended = () => {
+        setIsSirenPlaying(false);
+        oscRef.current = null;
+      };
+
+      osc.start(now);
+      osc.stop(now + totalDuration);
+
+      oscRef.current = osc;
+      setIsSirenPlaying(true);
+
+      // Failsafe state reset
+      setTimeout(() => {
+        setIsSirenPlaying(false);
+        if (oscRef.current === osc) {
+          oscRef.current = null;
+        }
+      }, (totalDuration + 0.1) * 1000);
     } catch (e) {
-      console.warn('[AUDIO] Synthesizer error:', e);
+      console.warn('[AUDIO] Clinical alert tone synthesizer error:', e);
+      setIsSirenPlaying(false);
     }
   };
+
+  const handleSirenToggle = () => {
+    if (isSirenPlaying) {
+      stopEmergencySiren();
+    } else {
+      playEmergencySiren(true);
+    }
+  };
+
+  // Backward compatibility alias
+  const triggerAudioTest = handleSirenToggle;
+
+  // Auto-trigger emergency siren when a new critical distress signal arrives from backend
+  useEffect(() => {
+    if (loading) return;
+
+    const currentActiveCount = alerts.filter(
+      a => a.status === 'ACTIVE' || a.status === 'IN_PROGRESS'
+    ).length;
+
+    // Compare active emergency counts: if increased, a new distress alert was received
+    if (prevActiveCountRef.current !== null && currentActiveCount > prevActiveCountRef.current) {
+      playEmergencySiren();
+    }
+
+    prevActiveCountRef.current = currentActiveCount;
+  }, [alerts, loading]);
 
   const activeAlerts = alerts.filter(a => a.status === 'ACTIVE' || a.status === 'IN_PROGRESS');
   const criticalCount = alerts.filter(a =>
@@ -202,7 +316,7 @@ export default function DoctorEmergency({
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'nowrap' }}>
           <span
             style={{
               backgroundColor: '#BE123C',
@@ -213,7 +327,8 @@ export default function DoctorEmergency({
               fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.375rem'
+              gap: '0.375rem',
+              whiteSpace: 'nowrap'
             }}
           >
             <Bell size={15} />
@@ -221,37 +336,33 @@ export default function DoctorEmergency({
           </span>
 
           <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="medx-button"
+            onClick={handleSirenToggle}
+            className="medx-button medx-button-secondary"
             style={{
               fontSize: '0.8125rem',
               padding: '0.4rem 0.75rem',
-              backgroundColor: isMuted ? '#F1F5F9' : '#FEE2E2',
-              color: isMuted ? '#475569' : '#BE123C',
-              border: '1px solid #CBD5E1',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.375rem'
+              gap: '0.375rem',
+              whiteSpace: 'nowrap'
             }}
           >
-            {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            <span>{isMuted ? 'Alarm Muted' : 'Alarm Active'}</span>
-          </button>
-
-          <button
-            onClick={triggerAudioTest}
-            className="medx-button medx-button-secondary"
-            style={{ fontSize: '0.8125rem', padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
-          >
             <Activity size={15} />
-            <span>{isPlayingAudio ? 'Sound Active...' : 'Test Siren (Simulated)'}</span>
+            <span>Test Siren</span>
           </button>
 
           {activeAlerts.length > 0 && (
             <button
               onClick={() => setSelectedMapAlert(activeAlerts[0])}
               className="medx-button medx-button-primary"
-              style={{ fontSize: '0.8125rem', padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}
+              style={{
+                fontSize: '0.8125rem',
+                padding: '0.4rem 0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                whiteSpace: 'nowrap'
+              }}
             >
               <Navigation size={15} />
               <span>GPS Radar ({activeAlerts.length})</span>
@@ -261,7 +372,7 @@ export default function DoctorEmergency({
           <button
             onClick={fetchAlerts}
             className="medx-button medx-button-secondary"
-            style={{ fontSize: '0.8125rem', padding: '0.4rem 0.75rem' }}
+            style={{ fontSize: '0.8125rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
           >
             <RefreshCw size={15} />
           </button>

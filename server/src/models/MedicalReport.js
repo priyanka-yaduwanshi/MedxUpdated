@@ -132,7 +132,7 @@ const medicalReportSchema = new mongoose.Schema(
     },
     reviewStatus: {
       type: String,
-      enum: ['Pending Review', 'Requires Review', 'Reviewed'],
+      enum: ['Pending Review', 'Requires Review', 'Reviewed', 'Sign-Off Required', 'Rejected'],
       default: 'Pending Review'
     },
     reviewedByDoctorId: {

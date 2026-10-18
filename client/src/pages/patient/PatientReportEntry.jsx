@@ -66,9 +66,7 @@ export default function PatientReportEntry({ onReportCreated }) {
     formData.append('report', file);
 
     try {
-      const res = await api.post('/reports/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/reports/upload', formData);
 
       setSuccess(`Lab report "${file.name}" successfully parsed and ingested! Extracted biomarkers recorded.`);
       setFile(null);

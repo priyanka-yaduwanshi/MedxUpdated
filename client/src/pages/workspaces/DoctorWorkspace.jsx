@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { ShieldCheck, Stethoscope } from 'lucide-react';
+import api from '../../services/api.js';
 import DoctorWorkstation from '../doctor/DoctorWorkstation.jsx';
 import DoctorPatients from '../doctor/DoctorPatients.jsx';
 import DoctorReports from '../doctor/DoctorReports.jsx';
@@ -24,6 +25,22 @@ export function DoctorWorkspace() {
   const [prescriptionPatient, setPrescriptionPatient] = useState(null);
   const [callPatient, setCallPatient] = useState(null);
   const [reviewingReport, setReviewingReport] = useState(null);
+  const [reportsKey, setReportsKey] = useState(0);
+
+  const handleSelectPatient = async (p) => {
+    if (!p) {
+      setSelectedPatient(null);
+      return;
+    }
+    const targetId = p._id || p.id;
+    try {
+      const res = await api.get(`/doctor/patients/${targetId}`);
+      setSelectedPatient(res.data);
+    } catch (err) {
+      console.warn('Could not fetch full dossier, using base patient info:', err);
+      setSelectedPatient(p);
+    }
+  };
 
   return (
     <div className="medx-container" style={{ paddingBottom: '3rem' }}>
@@ -75,7 +92,7 @@ export function DoctorWorkspace() {
       {/* Tab Panels */}
       {activeTab === 'workstation' && (
         <DoctorWorkstation
-          onSelectPatient={(p) => setSelectedPatient(p)}
+          onSelectPatient={handleSelectPatient}
           onOpenCall={(p) => setCallPatient(p)}
           onOpenPrescription={(p) => setPrescriptionPatient(p)}
           onOpenReview={(r) => setReviewingReport(r)}
@@ -85,7 +102,7 @@ export function DoctorWorkspace() {
 
       {activeTab === 'patients' && (
         <DoctorPatients
-          onSelectPatient={(p) => setSelectedPatient(p)}
+          onSelectPatient={handleSelectPatient}
           onOpenCall={(p) => setCallPatient(p)}
           onOpenPrescription={(p) => setPrescriptionPatient(p)}
         />
@@ -93,7 +110,7 @@ export function DoctorWorkspace() {
 
       {activeTab === 'appointments' && (
         <DoctorAppointments
-          onSelectPatient={(p) => setSelectedPatient(p)}
+          onSelectPatient={handleSelectPatient}
           onOpenCall={(p) => setCallPatient(p)}
           onOpenPrescription={(p) => setPrescriptionPatient(p)}
         />
@@ -105,13 +122,14 @@ export function DoctorWorkspace() {
 
       {activeTab === 'reports' && (
         <DoctorReports
+          key={reportsKey}
           onOpenReview={(r) => setReviewingReport(r)}
         />
       )}
 
       {activeTab === 'emergency' && (
         <DoctorEmergency
-          onSelectPatient={(p) => setSelectedPatient(p)}
+          onSelectPatient={handleSelectPatient}
           onOpenCall={(p) => setCallPatient(p)}
         />
       )}
@@ -184,6 +202,7 @@ export function DoctorWorkspace() {
           report={reviewingReport}
           onClose={() => setReviewingReport(null)}
           onSuccess={async () => {
+            setReportsKey((prev) => prev + 1);
             if (selectedPatient) {
               try {
                 const res = await api.get(`/doctor/patients/${selectedPatient._id || selectedPatient.id}`);

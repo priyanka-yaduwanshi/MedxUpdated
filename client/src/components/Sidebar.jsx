@@ -117,8 +117,7 @@ export function Sidebar({ mobileOpen, setMobileOpen, collapsed = false, onToggle
           { id: 'iot', label: 'Live Vitals (IoT)', path: '/patient?tab=iot', icon: Activity, isLive: true },
           { id: 'reports', label: 'Reports', path: '/patient?tab=reports', icon: FileText },
           { id: 'appointments', label: 'Appointments', path: '/patient?tab=appointments', icon: Calendar },
-          { id: 'whatif', label: 'What-If AI', path: '/patient?tab=whatif', icon: Sparkles },
-          { id: 'home', label: 'Overview', path: '/', icon: Home }
+          { id: 'whatif', label: 'What-If AI', path: '/patient?tab=whatif', icon: Sparkles }
         ];
       case 'doctor':
         return [
@@ -127,8 +126,7 @@ export function Sidebar({ mobileOpen, setMobileOpen, collapsed = false, onToggle
           { id: 'reports', label: 'Reviews', path: '/doctor?tab=reports', icon: FileText },
           { id: 'appointments', label: 'Appointments', path: '/doctor?tab=appointments', icon: Calendar },
           { id: 'availability', label: 'Availability', path: '/doctor?tab=availability', icon: Clock },
-          { id: 'emergency', label: 'SOS Desk', path: '/doctor?tab=emergency', icon: AlertTriangle, isAlert: true },
-          { id: 'home', label: 'Overview', path: '/', icon: Home }
+          { id: 'emergency', label: 'SOS Desk', path: '/doctor?tab=emergency', icon: AlertTriangle, isAlert: true }
         ];
       case 'hospital_admin':
         return [
@@ -139,16 +137,14 @@ export function Sidebar({ mobileOpen, setMobileOpen, collapsed = false, onToggle
           { id: 'doctors', label: 'Physicians', path: '/hospital?tab=doctors', icon: Stethoscope },
           { id: 'departments', label: 'Departments', path: '/hospital?tab=departments', icon: Layers },
           { id: 'profile-settings', label: 'Facility', path: '/hospital?tab=profile-settings', icon: Settings },
-          { id: 'emergency', label: 'Critical SOS', path: '/hospital?tab=emergency', icon: AlertOctagon, isAlert: true },
-          { id: 'home', label: 'Overview', path: '/', icon: Home }
+          { id: 'emergency', label: 'Critical SOS', path: '/hospital?tab=emergency', icon: AlertOctagon, isAlert: true }
         ];
       case 'lab_admin':
         return [
           { id: 'dashboard', label: 'Worklist', path: '/lab?tab=dashboard', icon: LayoutDashboard },
           { id: 'reports', label: 'Diagnostic Reports', path: '/lab?tab=reports', icon: FileText },
           { id: 'new_report', label: 'New Report', path: '/lab?tab=new_report', icon: PlusCircle },
-          { id: 'profile', label: 'Facility Profile', path: '/lab?tab=profile', icon: Building2 },
-          { id: 'home', label: 'Overview', path: '/', icon: Home }
+          { id: 'profile', label: 'Facility Profile', path: '/lab?tab=profile', icon: Building2 }
         ];
       default:
         return [
